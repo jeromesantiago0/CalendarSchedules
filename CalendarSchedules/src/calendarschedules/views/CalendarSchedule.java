@@ -12,6 +12,9 @@ import java.awt.Font;
 import java.awt.Color;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 import javax.swing.border.Border;
 import javax.swing.border.TitledBorder;
@@ -146,7 +149,6 @@ public class CalendarSchedule extends JFrame implements ActionListener{
 		pnlTeaskEditor.add(lblStartDate);
 		
 		txtTaskStartDate = new JTextField();
-		txtTaskStartDate.setText("06/01/2019");
 		txtTaskStartDate.setColumns(10);
 		txtTaskStartDate.setBounds(100, 54, 165, 20);
 		pnlTeaskEditor.add(txtTaskStartDate);
@@ -156,7 +158,6 @@ public class CalendarSchedule extends JFrame implements ActionListener{
 		pnlTeaskEditor.add(lblEndDate);
 		
 		txtTaskEndDate = new JTextField();
-		txtTaskEndDate.setText("07/27/2019");
 		txtTaskEndDate.setColumns(10);
 		txtTaskEndDate.setBounds(100, 82, 165, 20);
 		pnlTeaskEditor.add(txtTaskEndDate);
@@ -233,12 +234,24 @@ public class CalendarSchedule extends JFrame implements ActionListener{
 	
 	//enables and disables Task Editor panel
 	private void setEnableTaskPanel(boolean enable){
+		//sets the Target Start Date to the first task's start date
+		txtTaskStartDate.setText(txtTargetStartDate.getText());
+		
 		txtTaskID.setEnabled(enable);
 		txtTaskStartDate.setEnabled(enable);
 		txtTaskEndDate.setEnabled(enable);
 		txtTaskDependencies.setEnabled(enable);
 		txtTaskDescription.setEnabled(enable);
 		pnlTeaskEditor.setBackground(enable?Color.WHITE:Color.LIGHT_GRAY);
+	}
+	
+	//clears all the fields in the task editor panel
+	private void clearTaskTextFields(){
+		txtTaskID.setText("");
+		txtTaskStartDate.setText(txtTaskEndDate.getText());
+		txtTaskEndDate.setText("");
+		txtTaskDescription.setText("");
+		txtTaskDependencies.setText("");
 	}
 	
 	//populate Project tAsk Table after adding task
@@ -252,15 +265,17 @@ public class CalendarSchedule extends JFrame implements ActionListener{
 					tasks.split("~")[3],
 					tasks.split("~")[4],
 					tasks.split("~")[5],
-					tasks.split("~")[6]
+					getRemarks(tasks.split("~")[1], tasks.split("~")[2])
 			});
 		}
-		//clearTextFields();
+		clearTaskTextFields();
 	}
 	
 	String strProjectID = "";
 	@Override
 	public void actionPerformed(ActionEvent e) {
+		
+		//adding project in the database project
 		if(e.getSource()==btnSave){
 			String sql = "INSERT INTO project(ProjectName, StartDate, EndDate) " +
 					"VALUES('"+txtProjectName.getText()+"', '"+txtTargetStartDate.getText()+"', '"+txtTargetStartDate.getText()+"')";
@@ -274,6 +289,8 @@ public class CalendarSchedule extends JFrame implements ActionListener{
 			}
 		}
 		
+		//adding task for the project in the database
+		//showing task list in Task List Panel
 		else if(e.getSource()==btnAdd){
 			ppReadData = new ProjectPlanReadData();
 			strProjectID = ppReadData.getProjectID(ppConn.connect(), "SELECT ProjectID FROM project WHERE ProjectName = '"+txtProjectName.getText().trim()+"'");
@@ -286,7 +303,58 @@ public class CalendarSchedule extends JFrame implements ActionListener{
 				populateProjectTaskTable();
 			}
 		}
+		
+		//generate a formatted output of the project plan
+		else if(e.getSource()==btnGenerateReport){
+			System.out.println("----------------------------------------------------------------------------------");
+			System.out.println("#Project Plan for " + txtProjectName.getText());
+			System.out.println("#Target Start Date: " + txtTargetStartDate.getText());
+			System.out.println("#Target Completion Date: " + txtTargetEndDate.getText());
+			System.out.println();
+			System.out.println("#Project Tasks");
+			System.out.println("Task-ID\tStart-Date\tEnd-Date\tDuration(Days)\tTask\t\t\tDependencies\t\tRemarks");
+			System.out.println("-------\t----------\t--------\t--------------\t----\t\t\t------------\t\t-------");
+			for(int i = 0; i < tblModel.getRowCount(); i++){
+				System.out.print(tblModel.getValueAt(i, 0) + "\t");
+				System.out.print(tblModel.getValueAt(i, 1) + "\t");
+				System.out.print(tblModel.getValueAt(i, 2) + "\t");
+				System.out.print(tblModel.getValueAt(i, 3) + "\t\t");
+				System.out.print(tblModel.getValueAt(i, 4) + "\t\t\t");
+				System.out.print(tblModel.getValueAt(i, 5) + "\t\t\t");
+				System.out.print(getRemarks(tblModel.getValueAt(i, 1).toString(), tblModel.getValueAt(i, 2).toString()) + "\n");
+			}
+			System.out.println("----------------------------------------------------------------------------------");
+		}
+	}
+	
+	private String getRemarks(String startDate, String endDate){
+		String strRemarks = "";
+		String strFormattedStart = startDate.split("/")[2] + "-" +
+				startDate.split("/")[0] + "-" + 
+				startDate.split("/")[1];
+		String strFormattedEnd = endDate.split("/")[2] + "-" +
+				endDate.split("/")[0] + "-" + 
+				endDate.split("/")[1];
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+		Date start;
+		try {
+			start = sdf.parse(strFormattedStart);
+			Date end = sdf.parse(strFormattedEnd);
+			Date today = new Date();
+			
+			if(start.compareTo(today) > 0)
+				strRemarks = "NEW";
+			else if(start.compareTo(today) < 0)
+				strRemarks = "OPEN";
+			else if(today.compareTo(end) > 0)
+				strRemarks = "CLOSED";
+			
+		} catch (ParseException e) {
+			e.printStackTrace();
+		}
+		
+		
+		return strRemarks;
 	}
 
-	
 }
